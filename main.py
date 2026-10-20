@@ -11,7 +11,7 @@ import pdf_type
 OUTPUT_DIR = "output"
 
 
-def process_file(path: str):
+def process_file(path: str, mail_info: dict = None):
 
     """ Take one downloaded file, get its text and save it as JSON. """
 
@@ -41,8 +41,8 @@ def process_file(path: str):
         pdftype = "image"
         text = ocr_process.scanned_to_text(path)
 
-    # Step 6: Saving the text as a JSON file
-    out_path = json_process.text_to_json(text, path, pdftype, OUTPUT_DIR)
+    # Step 6: Saving the text and the mail details as a JSON file
+    out_path = json_process.text_to_json(text, path, pdftype, OUTPUT_DIR, mail_info)
     print(f"Saved: {out_path}")
 
 
