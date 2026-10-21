@@ -1,0 +1,1272 @@
+{
+  "name": "Ingestion-Normaliser email test set",
+  "version": 1,
+  "case_count": 50,
+  "my_address": "mybox@gmail.com",
+  "max_file_mb": 20,
+  "how_to_read": {
+    "mail": "The mail as it looks after parsing (same fields as mail_parser.parse_message).",
+    "processing": "Simulated result for each usable file: ok (default), failed, protected, file_duplicate.",
+    "setup": "Database state before the mail arrives: already_processed, blocked_sender, replies_today, replied_same_category_recently.",
+    "expected.category": "The correct category.",
+    "expected.reply": "true if a reply must be sent, false if none.",
+    "expected.reply_to": "The address the reply must go to (only when it differs from the sender).",
+    "expected.reply_contains": "Text that must appear in the reply."
+  },
+  "cases": [
+    {
+      "id": "T01",
+      "group": "AUTO_GENERATED",
+      "description": "Bank statement from a no-reply address",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "noreply@bank.com",
+        "reply_to_email": "",
+        "subject": "Your October statement",
+        "body": "Your statement is attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "statement.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "AUTO_GENERATED",
+        "reply": false
+      }
+    },
+    {
+      "id": "T02",
+      "group": "AUTO_GENERATED",
+      "description": "Sender address contains do-not-reply",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "do-not-reply@shop.com",
+        "reply_to_email": "",
+        "subject": "Order #4471 confirmed",
+        "body": "Thanks for your order.",
+        "headers": {},
+        "attachments": []
+      },
+      "expected": {
+        "category": "AUTO_GENERATED",
+        "reply": false
+      }
+    },
+    {
+      "id": "T03",
+      "group": "AUTO_GENERATED",
+      "description": "Bounce mail from mailer-daemon",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "MAILER-DAEMON@googlemail.com",
+        "reply_to_email": "",
+        "subject": "Delivery Status Notification (Failure)",
+        "body": "Your message could not be delivered.",
+        "headers": {},
+        "attachments": []
+      },
+      "expected": {
+        "category": "AUTO_GENERATED",
+        "reply": false
+      }
+    },
+    {
+      "id": "T04",
+      "group": "AUTO_GENERATED",
+      "description": "Normal-looking sender, but Auto-Submitted header says auto-replied",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "priya@example.com",
+        "reply_to_email": "",
+        "subject": "Re: Invoice",
+        "body": "I am away this week.",
+        "headers": {
+          "Auto-Submitted": "auto-replied"
+        },
+        "attachments": []
+      },
+      "expected": {
+        "category": "AUTO_GENERATED",
+        "reply": false
+      }
+    },
+    {
+      "id": "T05",
+      "group": "AUTO_GENERATED",
+      "description": "Newsletter marked Precedence: bulk",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "news@store.com",
+        "reply_to_email": "",
+        "subject": "Weekend sale",
+        "body": "Up to 50% off.",
+        "headers": {
+          "Precedence": "bulk"
+        },
+        "attachments": []
+      },
+      "expected": {
+        "category": "AUTO_GENERATED",
+        "reply": false
+      }
+    },
+    {
+      "id": "T06",
+      "group": "AUTO_GENERATED",
+      "description": "Mailing list mail with List-Unsubscribe and a PDF",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "updates@community.org",
+        "reply_to_email": "",
+        "subject": "October catalogue",
+        "body": "Catalogue attached.",
+        "headers": {
+          "List-Unsubscribe": "<mailto:unsub@community.org>"
+        },
+        "attachments": [
+          {
+            "filename": "catalogue.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "AUTO_GENERATED",
+        "reply": false
+      }
+    },
+    {
+      "id": "T07",
+      "group": "AUTO_GENERATED",
+      "description": "Out-of-office subject",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "rahul@example.com",
+        "reply_to_email": "",
+        "subject": "Out of office: back on Monday",
+        "body": "I will reply when I return.",
+        "headers": {},
+        "attachments": []
+      },
+      "expected": {
+        "category": "AUTO_GENERATED",
+        "reply": false
+      }
+    },
+    {
+      "id": "T08",
+      "group": "AUTO_GENERATED",
+      "description": "Automatic reply subject",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "meera@example.com",
+        "reply_to_email": "",
+        "subject": "Automatic reply: Documents for loan",
+        "body": "Thank you for your mail.",
+        "headers": {},
+        "attachments": []
+      },
+      "expected": {
+        "category": "AUTO_GENERATED",
+        "reply": false
+      }
+    },
+    {
+      "id": "T09",
+      "group": "SUSPICIOUS",
+      "description": "DKIM check failed, with a normal PDF",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "accounts@vendor-pay.com",
+        "reply_to_email": "",
+        "subject": "Invoice 9921",
+        "body": "Please see the attached invoice.",
+        "headers": {
+          "Authentication-Results": "mx.google.com; dkim=fail header.i=@vendor-pay.com; spf=pass"
+        },
+        "attachments": [
+          {
+            "filename": "invoice.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "SUSPICIOUS",
+        "reply": false
+      }
+    },
+    {
+      "id": "T10",
+      "group": "SUSPICIOUS",
+      "description": "SPF check failed",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "ceo@company-mail.net",
+        "reply_to_email": "",
+        "subject": "Payment request",
+        "body": "Please pay the attached invoice today.",
+        "headers": {
+          "Authentication-Results": "mx.google.com; spf=fail (domain does not designate sender)"
+        },
+        "attachments": [
+          {
+            "filename": "invoice.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "SUSPICIOUS",
+        "reply": false
+      }
+    },
+    {
+      "id": "T11",
+      "group": "SUSPICIOUS",
+      "description": "DMARC check failed",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "support@bank-secure.co",
+        "reply_to_email": "",
+        "subject": "Verify your account",
+        "body": "Open the attached form.",
+        "headers": {
+          "Authentication-Results": "mx.google.com; dmarc=fail (p=REJECT)"
+        },
+        "attachments": [
+          {
+            "filename": "form.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "SUSPICIOUS",
+        "reply": false
+      }
+    },
+    {
+      "id": "T12",
+      "group": "SUSPICIOUS",
+      "description": "Executable attachment",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "tom@example.com",
+        "reply_to_email": "",
+        "subject": "Invoice",
+        "body": "Please open the attachment.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "invoice.exe",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "SUSPICIOUS",
+        "reply": false
+      }
+    },
+    {
+      "id": "T13",
+      "group": "SUSPICIOUS",
+      "description": "Double extension hides an executable",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "lena@example.com",
+        "reply_to_email": "",
+        "subject": "Scan",
+        "body": "Scanned document attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "invoice.pdf.exe",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "SUSPICIOUS",
+        "reply": false
+      }
+    },
+    {
+      "id": "T14",
+      "group": "SUSPICIOUS",
+      "description": "Sender is on the blocklist, plain PDF",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "spammer@junk.com",
+        "reply_to_email": "",
+        "subject": "Documents",
+        "body": "Here are my documents.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "docs.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "setup": {
+        "blocked_sender": true
+      },
+      "expected": {
+        "category": "SUSPICIOUS",
+        "reply": false
+      }
+    },
+    {
+      "id": "T15",
+      "group": "PRIORITY",
+      "description": "no-reply sender with an .exe: AUTO_GENERATED wins over SUSPICIOUS",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "noreply@pay.com",
+        "reply_to_email": "",
+        "subject": "Receipt",
+        "body": "Receipt attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "receipt.exe",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "AUTO_GENERATED",
+        "reply": false
+      }
+    },
+    {
+      "id": "T16",
+      "group": "PRIORITY",
+      "description": "no-reply sender with the word refund: AUTO_GENERATED wins over NEEDS_HUMAN",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "noreply@shop.com",
+        "reply_to_email": "",
+        "subject": "Refund processed",
+        "body": "Your refund is on its way.",
+        "headers": {},
+        "attachments": []
+      },
+      "expected": {
+        "category": "AUTO_GENERATED",
+        "reply": false
+      }
+    },
+    {
+      "id": "T17",
+      "group": "PRIORITY",
+      "description": "Good PDF plus a hidden .scr file: whole mail is SUSPICIOUS",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "arun@example.com",
+        "reply_to_email": "",
+        "subject": "Report",
+        "body": "Report attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "report.pdf",
+            "size_bytes": 204800
+          },
+          {
+            "filename": "update.scr",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "SUSPICIOUS",
+        "reply": false
+      }
+    },
+    {
+      "id": "T18",
+      "group": "DUPLICATE",
+      "description": "Same Gmail message seen again (already processed)",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "john@example.com",
+        "reply_to_email": "",
+        "subject": "Invoice for October",
+        "body": "Invoice attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "invoice.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "setup": {
+        "already_processed": true
+      },
+      "expected": {
+        "category": "DUPLICATE",
+        "reply": false
+      }
+    },
+    {
+      "id": "T19",
+      "group": "DUPLICATE",
+      "description": "Same PDF sent again in a new mail (same content hash)",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "john@example.com",
+        "reply_to_email": "",
+        "subject": "Invoice again",
+        "body": "Sending it once more.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "invoice.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "processing": {
+        "invoice.pdf": "file_duplicate"
+      },
+      "expected": {
+        "category": "DUPLICATE",
+        "reply": false
+      }
+    },
+    {
+      "id": "T20",
+      "group": "DUPLICATE",
+      "description": "Two files, both already processed before",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "sara@example.com",
+        "reply_to_email": "",
+        "subject": "Re-sending",
+        "body": "Both files again.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "a.pdf",
+            "size_bytes": 204800
+          },
+          {
+            "filename": "b.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "processing": {
+        "a.pdf": "file_duplicate",
+        "b.pdf": "file_duplicate"
+      },
+      "expected": {
+        "category": "DUPLICATE",
+        "reply": false
+      }
+    },
+    {
+      "id": "T21",
+      "group": "NO_ATTACHMENT",
+      "description": "Person promises documents later",
+      "mail": {
+        "sender_name": "Kiran Rao",
+        "sender_email": "kiran@example.com",
+        "reply_to_email": "",
+        "subject": "Documents",
+        "body": "I will send the documents tomorrow.",
+        "headers": {},
+        "attachments": []
+      },
+      "expected": {
+        "category": "NO_ATTACHMENT",
+        "reply": true,
+        "reply_contains": [
+          "Hello Kiran",
+          "no attachment"
+        ]
+      }
+    },
+    {
+      "id": "T22",
+      "group": "NO_ATTACHMENT",
+      "description": "Empty mail: no subject, no body",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "unknown@example.com",
+        "reply_to_email": "",
+        "subject": "",
+        "body": "",
+        "headers": {},
+        "attachments": []
+      },
+      "expected": {
+        "category": "NO_ATTACHMENT",
+        "reply": true
+      }
+    },
+    {
+      "id": "T23",
+      "group": "UNSUPPORTED_ATTACHMENT",
+      "description": "Word document",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "anita@example.com",
+        "reply_to_email": "",
+        "subject": "Resume",
+        "body": "My resume is attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "resume.docx",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "UNSUPPORTED_ATTACHMENT",
+        "reply": true,
+        "reply_contains": [
+          "resume.docx"
+        ]
+      }
+    },
+    {
+      "id": "T24",
+      "group": "UNSUPPORTED_ATTACHMENT",
+      "description": "Excel sheet",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "vik@example.com",
+        "reply_to_email": "",
+        "subject": "Numbers",
+        "body": "Sheet attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "sheet.xlsx",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "UNSUPPORTED_ATTACHMENT",
+        "reply": true,
+        "reply_contains": [
+          "sheet.xlsx"
+        ]
+      }
+    },
+    {
+      "id": "T25",
+      "group": "UNSUPPORTED_ATTACHMENT",
+      "description": "ZIP archive",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "neha@example.com",
+        "reply_to_email": "",
+        "subject": "Files",
+        "body": "All files are in the zip.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "files.zip",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "UNSUPPORTED_ATTACHMENT",
+        "reply": true,
+        "reply_contains": [
+          "files.zip"
+        ]
+      }
+    },
+    {
+      "id": "T26",
+      "group": "UNSUPPORTED_ATTACHMENT",
+      "description": "Good PDF plus a Word file: PDF is processed, reply lists both",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "dev@example.com",
+        "reply_to_email": "",
+        "subject": "Invoice and notes",
+        "body": "Invoice and notes attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "invoice.pdf",
+            "size_bytes": 204800
+          },
+          {
+            "filename": "notes.docx",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "UNSUPPORTED_ATTACHMENT",
+        "reply": true,
+        "reply_contains": [
+          "notes.docx",
+          "invoice.pdf"
+        ]
+      }
+    },
+    {
+      "id": "T27",
+      "group": "PROTECTED_OR_TOO_LARGE",
+      "description": "Password-protected PDF",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "zoya@example.com",
+        "reply_to_email": "",
+        "subject": "Contract",
+        "body": "Contract attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "contract.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "processing": {
+        "contract.pdf": "protected"
+      },
+      "expected": {
+        "category": "PROTECTED_OR_TOO_LARGE",
+        "reply": true,
+        "reply_contains": [
+          "contract.pdf",
+          "password protected"
+        ]
+      }
+    },
+    {
+      "id": "T28",
+      "group": "PROTECTED_OR_TOO_LARGE",
+      "description": "PDF of 25 MB (limit is 20 MB)",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "omar@example.com",
+        "reply_to_email": "",
+        "subject": "Big scan",
+        "body": "Scan attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "huge.pdf",
+            "size_bytes": 26214400
+          }
+        ]
+      },
+      "expected": {
+        "category": "PROTECTED_OR_TOO_LARGE",
+        "reply": true,
+        "reply_contains": [
+          "huge.pdf",
+          "20 MB"
+        ]
+      }
+    },
+    {
+      "id": "T29",
+      "group": "PROTECTED_OR_TOO_LARGE",
+      "description": "One locked PDF and one good PDF",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "isha@example.com",
+        "reply_to_email": "",
+        "subject": "Two files",
+        "body": "Both attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "locked.pdf",
+            "size_bytes": 204800
+          },
+          {
+            "filename": "good.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "processing": {
+        "locked.pdf": "protected",
+        "good.pdf": "ok"
+      },
+      "expected": {
+        "category": "PROTECTED_OR_TOO_LARGE",
+        "reply": true,
+        "reply_contains": [
+          "locked.pdf",
+          "good.pdf"
+        ]
+      }
+    },
+    {
+      "id": "T30",
+      "group": "DOC_SUBMISSION",
+      "description": "Digital PDF invoice",
+      "mail": {
+        "sender_name": "John Smith",
+        "sender_email": "john@example.com",
+        "reply_to_email": "",
+        "subject": "Invoice for October",
+        "body": "Please find the invoice attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "invoice.pdf",
+            "size_bytes": 86016
+          }
+        ]
+      },
+      "expected": {
+        "category": "DOC_SUBMISSION",
+        "reply": true,
+        "reply_contains": [
+          "Hello John",
+          "invoice.pdf",
+          "Reference"
+        ]
+      }
+    },
+    {
+      "id": "T31",
+      "group": "DOC_SUBMISSION",
+      "description": "Scanned PDF that needs OCR",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "mala@example.com",
+        "reply_to_email": "",
+        "subject": "Signed form",
+        "body": "Signed form attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "scan.pdf",
+            "size_bytes": 2097152
+          }
+        ]
+      },
+      "expected": {
+        "category": "DOC_SUBMISSION",
+        "reply": true,
+        "reply_contains": [
+          "scan.pdf"
+        ]
+      }
+    },
+    {
+      "id": "T32",
+      "group": "DOC_SUBMISSION",
+      "description": "JPG photo of a document",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "ravi@example.com",
+        "reply_to_email": "",
+        "subject": "Receipt photo",
+        "body": "Photo of my receipt.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "photo.jpg",
+            "size_bytes": 1048576
+          }
+        ]
+      },
+      "expected": {
+        "category": "DOC_SUBMISSION",
+        "reply": true,
+        "reply_contains": [
+          "photo.jpg"
+        ]
+      }
+    },
+    {
+      "id": "T33",
+      "group": "DOC_SUBMISSION",
+      "description": "PNG with an upper-case extension",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "sunil@example.com",
+        "reply_to_email": "",
+        "subject": "Receipt",
+        "body": "Receipt attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "RECEIPT.PNG",
+            "size_bytes": 512000
+          }
+        ]
+      },
+      "expected": {
+        "category": "DOC_SUBMISSION",
+        "reply": true,
+        "reply_contains": [
+          "RECEIPT.PNG"
+        ]
+      }
+    },
+    {
+      "id": "T34",
+      "group": "DOC_SUBMISSION",
+      "description": "Two good PDFs in one mail: one reply with both",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "alia@example.com",
+        "reply_to_email": "",
+        "subject": "Two reports",
+        "body": "Both reports attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "a.pdf",
+            "size_bytes": 204800
+          },
+          {
+            "filename": "b.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "DOC_SUBMISSION",
+        "reply": true,
+        "reply_contains": [
+          "a.pdf",
+          "b.pdf"
+        ]
+      }
+    },
+    {
+      "id": "T35",
+      "group": "DOC_SUBMISSION",
+      "description": "The word 'urgently' is not the keyword 'urgent': normal submission",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "farid@example.com",
+        "reply_to_email": "",
+        "subject": "Documents needed urgently",
+        "body": "Please process the attached urgently.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "papers.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "DOC_SUBMISSION",
+        "reply": true,
+        "reply_contains": [
+          "papers.pdf"
+        ]
+      }
+    },
+    {
+      "id": "T36",
+      "group": "DOC_SUBMISSION",
+      "description": "Reply-To differs from From: reply goes to Reply-To",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "sales@company.com",
+        "reply_to_email": "billing@company.com",
+        "subject": "Purchase order",
+        "body": "PO attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "po.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "DOC_SUBMISSION",
+        "reply": true,
+        "reply_to": "billing@company.com",
+        "reply_contains": [
+          "po.pdf"
+        ]
+      }
+    },
+    {
+      "id": "T37",
+      "group": "DOC_SUBMISSION",
+      "description": "Auto-Submitted: no means a real person, not a robot",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "gita@example.com",
+        "reply_to_email": "",
+        "subject": "Application",
+        "body": "Application attached.",
+        "headers": {
+          "Auto-Submitted": "no"
+        },
+        "attachments": [
+          {
+            "filename": "application.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "DOC_SUBMISSION",
+        "reply": true,
+        "reply_contains": [
+          "application.pdf"
+        ]
+      }
+    },
+    {
+      "id": "T38",
+      "group": "DOC_SUBMISSION",
+      "description": "File of exactly 20 MB is allowed (only larger is too large)",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "bala@example.com",
+        "reply_to_email": "",
+        "subject": "Large scan",
+        "body": "Scan attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "exact20.pdf",
+            "size_bytes": 20971520
+          }
+        ]
+      },
+      "expected": {
+        "category": "DOC_SUBMISSION",
+        "reply": true,
+        "reply_contains": [
+          "exact20.pdf"
+        ]
+      }
+    },
+    {
+      "id": "T39",
+      "group": "DOC_SUBMISSION",
+      "description": "One file seen before, one new: the new one is processed",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "hema@example.com",
+        "reply_to_email": "",
+        "subject": "Updated files",
+        "body": "Old and new file.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "old.pdf",
+            "size_bytes": 204800
+          },
+          {
+            "filename": "new.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "processing": {
+        "old.pdf": "file_duplicate",
+        "new.pdf": "ok"
+      },
+      "expected": {
+        "category": "DOC_SUBMISSION",
+        "reply": true,
+        "reply_contains": [
+          "new.pdf"
+        ]
+      }
+    },
+    {
+      "id": "T40",
+      "group": "DOC_FAILED",
+      "description": "Blurry photo, OCR failed after 3 tries",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "yash@example.com",
+        "reply_to_email": "",
+        "subject": "Photo",
+        "body": "Photo of the form.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "blurry.jpg",
+            "size_bytes": 3145728
+          }
+        ]
+      },
+      "processing": {
+        "blurry.jpg": "failed"
+      },
+      "expected": {
+        "category": "DOC_FAILED",
+        "reply": true,
+        "reply_contains": [
+          "blurry.jpg",
+          "could not be read"
+        ]
+      }
+    },
+    {
+      "id": "T41",
+      "group": "DOC_FAILED",
+      "description": "Corrupt PDF",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "uma@example.com",
+        "reply_to_email": "",
+        "subject": "Report",
+        "body": "Report attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "broken.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "processing": {
+        "broken.pdf": "failed"
+      },
+      "expected": {
+        "category": "DOC_FAILED",
+        "reply": true,
+        "reply_contains": [
+          "broken.pdf"
+        ]
+      }
+    },
+    {
+      "id": "T42",
+      "group": "DOC_FAILED",
+      "description": "One good file and one failed file: DOC_FAILED, reply lists both",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "wasim@example.com",
+        "reply_to_email": "",
+        "subject": "Two files",
+        "body": "Both attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "good.pdf",
+            "size_bytes": 204800
+          },
+          {
+            "filename": "bad.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "processing": {
+        "good.pdf": "ok",
+        "bad.pdf": "failed"
+      },
+      "expected": {
+        "category": "DOC_FAILED",
+        "reply": true,
+        "reply_contains": [
+          "bad.pdf",
+          "good.pdf"
+        ]
+      }
+    },
+    {
+      "id": "T43",
+      "group": "NEEDS_HUMAN",
+      "description": "Complaint, no attachment",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "angry@example.com",
+        "reply_to_email": "",
+        "subject": "Problem with my order",
+        "body": "I want to file a complaint about my last order.",
+        "headers": {},
+        "attachments": []
+      },
+      "expected": {
+        "category": "NEEDS_HUMAN",
+        "reply": true,
+        "reply_contains": [
+          "person from our team",
+          "Reference"
+        ]
+      }
+    },
+    {
+      "id": "T44",
+      "group": "NEEDS_HUMAN",
+      "description": "'call me' in the body",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "client@example.com",
+        "reply_to_email": "",
+        "subject": "About the contract",
+        "body": "Please call me when you can.",
+        "headers": {},
+        "attachments": []
+      },
+      "expected": {
+        "category": "NEEDS_HUMAN",
+        "reply": true
+      }
+    },
+    {
+      "id": "T45",
+      "group": "NEEDS_HUMAN",
+      "description": "Urgent with a good PDF: file is processed, but only the holding reply is sent",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "boss@example.com",
+        "reply_to_email": "",
+        "subject": "URGENT: invoice",
+        "body": "This is urgent, invoice attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "invoice.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "NEEDS_HUMAN",
+        "reply": true,
+        "reply_contains": [
+          "person from our team"
+        ]
+      }
+    },
+    {
+      "id": "T46",
+      "group": "NEEDS_HUMAN",
+      "description": "Subject is a question and there is no usable file",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "nina@example.com",
+        "reply_to_email": "",
+        "subject": "Did you receive my invoice?",
+        "body": "Just checking.",
+        "headers": {},
+        "attachments": []
+      },
+      "expected": {
+        "category": "NEEDS_HUMAN",
+        "reply": true
+      }
+    },
+    {
+      "id": "T47",
+      "group": "NEEDS_HUMAN",
+      "description": "Keyword match is crude: 'ignore my earlier complaint' still goes to a person",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "ravi2@example.com",
+        "reply_to_email": "",
+        "subject": "Updated file",
+        "body": "Please ignore my earlier complaint, the new file is attached.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "new_file.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "NEEDS_HUMAN",
+        "reply": true,
+        "note": "Known limitation of keyword matching. It fails safe: a person reads the mail."
+      }
+    },
+    {
+      "id": "T48",
+      "group": "REPLY_RULES",
+      "description": "Normal submission, but this sender already got 5 replies today: no reply",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "busy@example.com",
+        "reply_to_email": "",
+        "subject": "More documents",
+        "body": "Another file.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "doc.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "setup": {
+        "replies_today": 5
+      },
+      "expected": {
+        "category": "DOC_SUBMISSION",
+        "reply": false
+      }
+    },
+    {
+      "id": "T49",
+      "group": "REPLY_RULES",
+      "description": "Normal submission, but the same category was answered to this sender in the last hour",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "again@example.com",
+        "reply_to_email": "",
+        "subject": "Another file",
+        "body": "One more.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "doc2.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "setup": {
+        "replied_same_category_recently": true
+      },
+      "expected": {
+        "category": "DOC_SUBMISSION",
+        "reply": false
+      }
+    },
+    {
+      "id": "T50",
+      "group": "REPLY_RULES",
+      "description": "Mail from our own address (for example a forward to ourselves): processed, no reply",
+      "mail": {
+        "sender_name": "",
+        "sender_email": "mybox@gmail.com",
+        "reply_to_email": "",
+        "subject": "Note to self",
+        "body": "File for processing.",
+        "headers": {},
+        "attachments": [
+          {
+            "filename": "self.pdf",
+            "size_bytes": 204800
+          }
+        ]
+      },
+      "expected": {
+        "category": "DOC_SUBMISSION",
+        "reply": false
+      }
+    }
+  ]
+}
