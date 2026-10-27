@@ -1,18 +1,19 @@
-import base64
 import os
-import time
+import re
 
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
+import mail_parser
 
-# gmail.modify lets us read mails and remove the UNREAD label (mark as read)
+# gmail.modify lets us read mails, mark them as read and send replies
 SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
-CREDENTIALS_FILE = "credentials.json"  # downloaded from Google Cloud Console
-TOKEN_FILE = "token.json"              # created automatically after the first login
-ALLOWED_EXTS = (".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CREDENTIALS_FILE = os.path.join(BASE_DIR, "credentials.json")   # downloaded from Google Cloud Console
+TOKEN_FILE = os.path.join(BASE_DIR, "token.json")               # created after the first login
 
 
 def get_service():
@@ -27,8 +28,11 @@ def get_service():
     # Step 2: Refreshing the login, or opening the browser to log in the first time
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
+            try:
+                creds.refresh(Request())
+            except RefreshError:
+                creds = None                      # the saved login is no longer valid, log in again
+        if not creds or not creds.valid:
             flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
             creds = flow.run_local_server(port=0)
 
@@ -36,103 +40,59 @@ def get_service():
         with open(TOKEN_FILE, "w") as f:
             f.write(creds.to_json())
 
-    # Step 4: Building the Gmail API service
     return build("gmail", "v1", credentials=creds)
 
 
-def _walk_parts(payload):
+def fetch_unread(service):
 
-    """ Yield every part of a mail, including parts nested inside other parts. """
+    """ Yield every unread inbox mail as a simple dictionary (oldest first). Attachments are not downloaded yet. """
 
-    yield payload
-    for part in payload.get("parts", []):
-        yield from _walk_parts(part)
-
-
-def check_mail(save_dir="attachments") -> list:
-
-    """
-    Check the inbox once, download attachments from unread mails.
-    Returns a list of (path, mail_info) for every saved file.
-    """
-
-    # Step 1: Creating the folder for attachments and connecting to Gmail
-    os.makedirs(save_dir, exist_ok=True)
-    service = get_service()
-    saved_files = []
-
-    # Step 2: Asking Gmail for unread inbox mails that have attachments (all pages)
-    messages = []
-    request = service.users().messages().list(
-        userId="me", labelIds=["INBOX"], q="is:unread has:attachment"
-    )
+    ids = []
+    request = service.users().messages().list(userId="me", labelIds=["INBOX"], q="is:unread")
     while request is not None:
-        response = request.execute()
-        messages.extend(response.get("messages", []))
+        response = request.execute(num_retries=3)
+        ids += [m["id"] for m in response.get("messages", [])]
         request = service.users().messages().list_next(request, response)
 
-    # Step 3: Reading each unread mail in full
-    for item in messages:
-        msg_id = item["id"]
-        msg = service.users().messages().get(userId="me", id=msg_id, format="full").execute()
-
-        # Step 4: Getting sender, subject and date from the mail headers
-        headers = {h["name"].lower(): h["value"] for h in msg["payload"].get("headers", [])}
-        mail_info = {
-            "sender": headers.get("from"),
-            "subject": headers.get("subject"),
-            "date": headers.get("date"),
-        }
-
-        # Step 5: Going through the parts of the mail to find attachments
-        for part in _walk_parts(msg["payload"]):
-            filename = os.path.basename(part.get("filename", ""))
-            if not filename or not filename.lower().endswith(ALLOWED_EXTS):
-                continue
-
-            # Step 6: Getting the file data (big files are fetched separately by attachment id)
-            body = part.get("body", {})
-            if "attachmentId" in body:
-                att = service.users().messages().attachments().get(
-                    userId="me", messageId=msg_id, id=body["attachmentId"]
-                ).execute()
-                data = att["data"]
-            else:
-                data = body.get("data")
-            if not data:
-                continue
-
-            # Step 7: Saving the file, with the mail id in the name to avoid overwriting
-            path = os.path.join(save_dir, f"{msg_id}_{filename}")
-            with open(path, "wb") as f:
-                f.write(base64.urlsafe_b64decode(data))
-            saved_files.append((path, mail_info))
-
-        # Step 8: Marking the mail as read (the API does not do this by itself)
-        service.users().messages().modify(
-            userId="me", id=msg_id, body={"removeLabelIds": ["UNREAD"]}
-        ).execute()
-
-    # Step 9: Returning the saved files with their mail details
-    return saved_files
+    for msg_id in reversed(ids):
+        try:
+            msg = service.users().messages().get(userId="me", id=msg_id, format="full").execute(num_retries=3)
+        except Exception as e:
+            print("Could not read mail %s: %s" % (msg_id, e))
+            continue
+        yield mail_parser.parse_message(msg)
 
 
-def watch_mail(on_file, save_dir="attachments", interval=30):
+def download_attachment(service, mail: dict, att: dict, save_dir: str) -> str:
 
-    """ Keep checking the inbox every `interval` seconds and call on_file(path, mail_info) for each new attachment. """
+    """ Save one attachment and return its path. """
 
-    print("Watching inbox... (press Ctrl+C to stop)")
+    if att.get("attachment_id"):
+        data = service.users().messages().attachments().get(
+            userId="me", messageId=mail["id"], id=att["attachment_id"]
+        ).execute(num_retries=3)["data"]
+    else:
+        data = att.get("data")
+    if not data:
+        raise ValueError("the attachment has no data")
 
-    # Step 1: Checking the inbox again and again
-    while True:
-        for path, mail_info in check_mail(save_dir):
-            print(f"New file: {path}")
+    os.makedirs(save_dir, exist_ok=True)
+    safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", att["filename"]).strip() or "file"
+    path = os.path.join(save_dir, "%s_%s" % (mail["id"], safe_name))
 
-            # Step 2: Handing each new file and its mail details to the function given by the caller
-            on_file(path, mail_info)
+    base, ext = os.path.splitext(path)       # two attachments with the same name in one mail
+    counter = 2
+    while os.path.exists(path):
+        path = "%s_%d%s" % (base, counter, ext)
+        counter += 1
 
-        # Step 3: Waiting before the next check
-        time.sleep(interval)
+    with open(path, "wb") as f:
+        f.write(mail_parser.b64decode(data))
+    return path
 
 
-# check_mail() checks once and returns (path, mail_info) pairs, watch_mail() keeps checking.
+def mark_read(service, msg_id: str):
+
+    """ The API does not mark a mail as read by itself, so we remove the UNREAD label. """
+
+    service.users().messages().modify(userId="me", id=msg_id, body={"removeLabelIds": ["UNREAD"]}).execute(num_retries=3)

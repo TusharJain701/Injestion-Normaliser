@@ -1,0 +1,212 @@
+# ============================================================================
+#  Ingestion Normaliser: the one file you edit.
+#  Save the file and the running program picks the changes up on its next
+#  check of the inbox (no restart). If you make a mistake, the program prints
+#  what is wrong and keeps using the last good version.
+#
+#  Sections:   settings   limits and paths
+#              reply      greeting and signature used in every reply
+#              templates  the reply text for each category
+#              fields     values to pull out of documents and mails
+#              rules      "if this, then reply that" (compare things here)
+# ============================================================================
+
+settings:
+  poll_interval_seconds: 30          # how often Gmail is checked
+  max_file_mb: 20                    # bigger attachments are refused
+  max_attempts: 3                    # tries per file before it counts as failed
+  max_replies_per_sender_per_day: 5
+  same_category_cooldown_minutes: 60 # same sender + same category: one reply per hour
+  allowed_senders: []                # empty = answer everyone. Example: ["@mycompany.com", "boss@gmail.com"]
+  needs_human_words: [urgent, complaint, refund, call me]   # these words send a mail to a person
+  alert_email: ""                    # optional: gets a short mail when a document fails
+  tesseract_cmd: ""                  # Windows example: C:\Program Files\Tesseract-OCR\tesseract.exe
+  ocr_language: eng                  # Tesseract language code, for example eng or eng+hin
+  ocr_dpi: 300                       # sharpness used when a PDF page is turned into a picture
+  min_digital_chars: 50              # a PDF page with fewer characters than this is read with OCR
+  attachments_dir: attachments       # original files are saved here
+  output_dir: output                 # the JSON files are saved here
+  database: ingestion.db
+
+reply:
+  greeting_named: "Hello {first_name},"
+  greeting_plain: "Hello,"
+  signature: |
+    Regards,
+    R2c.AI
+
+# ----------------------------------------------------------------------------
+#  TEMPLATES: the reply for each category.
+#  Names you can use inside { }:
+#    {greeting} {first_name} {name} {sender} {subject} {signature}
+#    {files}        names of the files that were processed
+#    {references}   reference numbers of those files
+#    {problems}     list of files that could not be used, with the reason
+#    {ok_note}      "These files were processed successfully: ..." (empty if none)
+#    {rule_notes}   text added by rules (see below), empty if no rule fired
+#    {email_id} {category} {max_file_mb}
+#    ...and the name of any field defined in the "fields" section.
+#  To print a real curly bracket, write it twice: {{ }}
+#  Categories that never get a reply: AUTO_GENERATED, SUSPICIOUS, DUPLICATE.
+# ----------------------------------------------------------------------------
+templates:
+  DOC_SUBMISSION:
+    body: |
+      {greeting}
+
+      We received your file(s) and processed them successfully.
+
+      Reference: {references}
+      Files: {files}
+
+      {rule_notes}
+
+      Please keep the reference if you need to contact us.
+
+      {signature}
+
+  NO_ATTACHMENT:
+    body: |
+      {greeting}
+
+      Your mail reached us, but there was no attachment. Please reply to this mail with your document attached as a PDF or an image (JPG, PNG, TIFF, BMP or WEBP).
+
+      {signature}
+
+  UNSUPPORTED_ATTACHMENT:
+    body: |
+      {greeting}
+
+      We could not accept these files:
+      {problems}
+
+      We can only read PDF files and images (JPG, PNG, TIFF, BMP, WEBP). Please convert the file and send it again.
+
+      {ok_note}
+
+      {signature}
+
+  PROTECTED_OR_TOO_LARGE:
+    body: |
+      {greeting}
+
+      We could not open these files:
+      {problems}
+
+      Please send an unprotected copy, or a smaller one (up to {max_file_mb} MB), as a reply to this mail.
+
+      {ok_note}
+
+      {signature}
+
+  DOC_FAILED:
+    body: |
+      {greeting}
+
+      We could not read these files even after several tries:
+      {problems}
+
+      Please send them again as a clear, well-lit scan or the original PDF.
+
+      {ok_note}
+
+      {signature}
+
+  NEEDS_HUMAN:
+    body: |
+      {greeting}
+
+      Thank you for your message. A person from our team will read it and reply soon.
+
+      Reference: {email_id}
+
+      {signature}
+
+# ----------------------------------------------------------------------------
+#  FIELDS: values the program looks for.
+#  A field is found with a pattern (a regular expression). The first bracket
+#  ( ) in the pattern is the value. Searching ignores upper/lower case.
+#    source: document (default) = in the text of each attachment
+#            email              = in the subject and body of the mail
+#            subject            = in the subject only
+#    type:   text (default) or number (commas are removed, so 12,400 = 12400)
+#    match:  first (default) or last   (totals are usually the last match)
+#  Found values are saved in each JSON file and can be used in rules and templates.
+#  Change the patterns to fit your own documents.
+# ----------------------------------------------------------------------------
+fields:
+  invoice_no:
+    pattern: 'invoice\s*(?:no\.?|number|#)\s*[:\-]?\s*([A-Za-z0-9][A-Za-z0-9\-/]*)'
+    type: text
+
+  invoice_total:
+    pattern: '(?:grand\s+total|total\s+due|amount\s+due|total)\s*[:\-]?\s*(?:rs\.?|inr|₹|\$)?\s*(\d[\d,]*(?:\.\d+)?)'
+    type: number
+    match: last
+
+  claimed_total:
+    source: email
+    pattern: '(?:amount|total)\D{0,20}?(\d[\d,]*(?:\.\d+)?)'
+    type: number
+
+# ----------------------------------------------------------------------------
+#  RULES: change or compare something and reply accordingly.
+#
+#  A rule fires when ALL of its "when" lines are true. Rules are checked top
+#  to bottom. (For "or", write two rules.)
+#
+#  A "when" line looks like:   <name> <test> <value>
+#    <name>   a field from above, or one of:
+#             category sender subject body text filename file_count ok_count
+#    <test>   ==  !=  >  >=  <  <=   contains   not contains   matches (regex)
+#             not matches   in   not in   exists   missing
+#    <value>  a number, some text, "quoted text", or the name of another field
+#             (that is how two things are compared). For in / not in, list the
+#             values with commas.
+#  If a value a line needs is missing, the line is false. Use "missing" to test for that.
+#
+#  What a rule can do:
+#    reply:    text to send. Placeholders from the template list work here too.
+#    mode:     append (default) = add the text where {rule_notes} stands in the template
+#              replace          = send this text instead of the template
+#    no_reply: true   = do not answer this mail
+#    flag:     text   = mark the mail for a person, with this reason
+#    category: NAME   = change the category
+#  First matching "replace" wins; every matching "append" is added.
+#  Set  enabled: false  to switch a rule off.
+#
+#  The three examples below are switched off. Turn one on and edit it.
+# ----------------------------------------------------------------------------
+rules:
+  - name: Large invoice needs approval
+    enabled: false
+    when:
+      - invoice_total > 50000
+    mode: append
+    reply: |
+      Note: this invoice is above 50,000, so it needs approval first. We will confirm within 2 working days.
+    flag: Amount above 50,000
+
+  - name: Amount in the mail does not match the document
+    enabled: false
+    when:
+      - invoice_total exists
+      - claimed_total exists
+      - invoice_total != claimed_total
+    mode: replace
+    reply: |
+      {greeting}
+
+      The amount in your mail ({claimed_total}) does not match the total in {files} ({invoice_total}). Please check it and send the correct file.
+
+      Reference: {references}
+
+      {signature}
+    flag: Amount mismatch
+
+  - name: Mail from an unknown sender
+    enabled: false
+    when:
+      - sender not in finance@acme.com, billing@globex.com
+    no_reply: true
+    flag: Sender is not on the approved list

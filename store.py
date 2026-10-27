@@ -49,7 +49,10 @@ def init_db():
             category       TEXT,
             reply_status   TEXT NOT NULL DEFAULT 'not_needed',
             reply_sent_at  TEXT,
-            reply_msg_id   TEXT
+            reply_msg_id   TEXT,
+            flagged        INTEGER NOT NULL DEFAULT 0,
+            flag_reason    TEXT,
+            handled        INTEGER NOT NULL DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS documents (
@@ -69,6 +72,14 @@ def init_db():
             address        TEXT PRIMARY KEY
         );
         """)
+
+        # Databases created by an earlier version get the new columns
+        have = {row["name"] for row in conn.execute("PRAGMA table_info(emails)")}
+        for column, definition in (("flagged", "INTEGER NOT NULL DEFAULT 0"),
+                                   ("flag_reason", "TEXT"),
+                                   ("handled", "INTEGER NOT NULL DEFAULT 0")):
+            if column not in have:
+                conn.execute("ALTER TABLE emails ADD COLUMN %s %s" % (column, definition))
         conn.commit()
     finally:
         conn.close()
@@ -102,6 +113,13 @@ def start_email(mail: dict) -> int:
 
 def finish_email(email_id: int, category: str, reply_status: str = "not_needed"):
     _execute("UPDATE emails SET category = ?, reply_status = ? WHERE id = ?", (category, reply_status, email_id))
+
+
+def flag_email(email_id: int, reason: str):
+
+    """ Mark a mail for a person to look at. """
+
+    _execute("UPDATE emails SET flagged = 1, flag_reason = ? WHERE id = ?", (reason, email_id))
 
 
 def set_reply(email_id: int, status: str, reply_msg_id: str = None):

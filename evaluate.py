@@ -1,4 +1,7 @@
 """
+Run the test emails in test_emails.json through the real classifier and reply rules,
+and compare the results with the expected answers.
+
 Usage:
     python evaluate.py            show a short report
     python evaluate.py -v         also show every passing case

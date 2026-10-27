@@ -1,12 +1,11 @@
 import re
 
+import config
 import store
 
 
 ALLOWED_EXTS = (".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp")
 DANGEROUS_EXTS = (".exe", ".js", ".bat", ".cmd", ".com", ".scr", ".vbs", ".msi", ".jar", ".ps1", ".lnk", ".dll", ".hta")
-MAX_FILE_MB = 20
-NEEDS_HUMAN_WORDS = ("urgent", "complaint", "refund", "call me")
 
 # Categories that never get a reply
 NO_REPLY_CATEGORIES = ("AUTO_GENERATED", "SUSPICIOUS", "DUPLICATE")
@@ -76,7 +75,7 @@ def sort_attachments(mail: dict):
         name = att["filename"].lower()
         if not name.endswith(ALLOWED_EXTS):
             unsupported.append(att)
-        elif att["size"] > MAX_FILE_MB * 1024 * 1024:
+        elif att["size"] > config.setting("max_file_mb") * 1024 * 1024:
             too_large.append(att)
         else:
             usable.append(att)
@@ -85,7 +84,8 @@ def sort_attachments(mail: dict):
 
 def needs_human(mail: dict, got_ok_file: bool) -> bool:
     text = (mail["subject"] + " " + mail["body"]).lower()
-    if any(re.search(r"\b" + re.escape(w) + r"\b", text) for w in NEEDS_HUMAN_WORDS):
+    words = [str(w).lower() for w in config.setting("needs_human_words")]
+    if any(re.search(r"\b" + re.escape(w) + r"\b", text) for w in words):
         return True
     return mail["subject"].strip().endswith("?") and not got_ok_file
 

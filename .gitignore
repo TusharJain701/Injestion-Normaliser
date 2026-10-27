@@ -1,0 +1,17 @@
+# Secrets: never commit these
+credentials.json
+token.json
+.env
+_env
+
+# Data from real mails (personal documents)
+attachments/
+output/
+*.db
+*.dryrun
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
